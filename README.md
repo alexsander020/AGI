@@ -239,4 +239,4 @@ A definir.
 
 ## 👤 Autor
 
-**Alex** ([@alexsander020](https://github.com/alexsander020)), estudante de Ciência da Computação na FECAP.
+**Alexsander** ([@alexsander020](https://github.com/alexsander020)), estudante de Ciência da Computação na FECAP.
