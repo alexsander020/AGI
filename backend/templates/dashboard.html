@@ -1,0 +1,107 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Monitor de Solo</title>
+<meta name="csrf" content="{{ csrf_token() }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+{% include "_base_css.html" %}</head>
+<body><main>
+<header><h1>Monitor de Solo <span id="status" class="off"></span></h1>
+<div>{% if usuario['papel'] == 'admin' %}<a href="{{ url_for('admin') }}">Admin</a> &middot; {% endif %}{{ usuario['email'] }}
+<form method="post" action="{{ url_for('logout') }}" style="display:inline">
+<input type="hidden" name="csrf" value="{{ csrf_token() }}"><button>Sair</button></form></div></header>
+
+<p>Dispositivo: <select id="dev"></select>
+ Período: <select id="horas"><option value="1">1 h</option><option value="24" selected>24 h</option><option value="168">7 dias</option></select></p>
+
+<div class="grid">
+  <div class="card"><small>Solo</small><b id="solo">-</b></div>
+  <div class="card"><small>Umidade média (%)</small><b id="umid">-</b></div>
+  <div class="card"><small>Nitrogênio N (mg/kg)</small><b id="n">-</b></div>
+  <div class="card"><small>Fósforo P (mg/kg)</small><b id="p">-</b></div>
+  <div class="card"><small>Potássio K (mg/kg)</small><b id="k">-</b></div>
+  <div class="card"><small>pH</small><b id="ph">-</b></div>
+  <div class="card"><small>Válvula</small><b id="valvula">-</b></div>
+</div>
+<div class="charts">
+  <div class="card"><canvas id="cUmid"></canvas></div>
+  <div class="card"><canvas id="cNpk"></canvas></div>
+</div>
+<div class="card"><h2>Limites de alerta deste dispositivo</h2>
+  <form id="fLim" class="inline">
+    <label>Umidade mínima (%) <input type="number" id="l_umid_min" min="0" max="100" step="1" required style="width:90px"></label>
+    <label>N mín. (mg/kg) <input type="number" id="l_n_min" min="0" max="10000" step="1" required style="width:90px"></label>
+    <label>P mín. (mg/kg) <input type="number" id="l_p_min" min="0" max="10000" step="1" required style="width:90px"></label>
+    <label>K mín. (mg/kg) <input type="number" id="l_k_min" min="0" max="10000" step="1" required style="width:90px"></label>
+    <button type="submit">Salvar</button><button type="button" id="bPadrao">Restaurar padrão</button>
+  </form>
+  <small id="limInfo">Você é avisado quando a média das últimas leituras fica abaixo do mínimo. Use 0 para desativar um alerta. Os valores de N, P e K dependem da cultura e do solo: consulte um agrônomo.</small>
+  <div id="limMsg"></div></div>
+<div class="card"><small>Últimos alertas</small><div id="alertas">-</div></div>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const fmt = (v, d=0) => v == null ? "-" : Number(v).toFixed(d);
+const mk = (id, datasets) => new Chart($(id), {type:"line", data:{datasets}, options:{
+  parsing:false, animation:false, pointRadius:0,
+  scales:{x:{type:"linear", ticks:{callback:v=>new Date(v*1000).toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}}}}});
+const cUmid = mk("cUmid", [{label:"Umidade (%)", data:[], borderColor:"#38bdf8"}]);
+const cNpk = mk("cNpk", [{label:"N", data:[], borderColor:"#4ade80"},{label:"P", data:[], borderColor:"#fbbf24"},{label:"K", data:[], borderColor:"#f472b6"}]);
+const j = async url => { const r = await fetch(url); if (r.status === 401) location.href = "/login"; return r.json(); };
+
+async function carregarDispositivos() {
+  const lista = await j("/api/dispositivos");
+  const sel = $("dev"); sel.textContent = "";
+  lista.forEach(d => { const o = document.createElement("option"); o.value = d.device;
+    o.textContent = d.fazenda + " / " + d.nome; sel.appendChild(o); });
+  if (!lista.length) $("status").textContent = "(nenhum dispositivo cadastrado)";
+}
+async function atualizar() {
+  const dev = $("dev").value; if (!dev) return;
+  const q = "device=" + encodeURIComponent(dev);
+  try {
+    const u = await j("/api/ultima?" + q);
+    if (u.vazio) { $("status").textContent = "(sem dados)"; }
+    else {
+      $("solo").textContent = u.solo; $("solo").className = u.solo === "SECO" ? "seco" : "umido";
+      $("umid").textContent = fmt(u.umid_media);
+      const ok = u.npk_ok === 1;
+      ["n","p","k"].forEach(x => $(x).textContent = ok ? fmt(u[x]) : "falha");
+      $("ph").textContent = ok ? fmt(u.ph, 1) : "falha";
+      $("valvula").textContent = u.valvula ? "ABERTA" : "fechada";
+      $("status").textContent = u.atrasada ? "(dispositivo offline)" : "";
+    }
+    const h = await j("/api/historico?" + q + "&horas=" + $("horas").value);
+    const pts = k => h.filter(r => r[k] != null).map(r => ({x:r.ts, y:r[k]}));
+    cUmid.data.datasets[0].data = pts("umid_media");
+    ["n","p","k"].forEach((k,i) => cNpk.data.datasets[i].data = pts(k));
+    cUmid.update(); cNpk.update();
+    const al = await j("/api/alertas"); const box = $("alertas"); box.textContent = "";
+    if (!al.length) box.textContent = "nenhum";
+    al.forEach(a => { const p = document.createElement("div");
+      p.textContent = new Date(a.ts*1000).toLocaleString() + " - " + a.device + " - " + a.tipo + ": " + a.msg; box.appendChild(p); });
+  } catch (e) { $("status").textContent = "(erro de conexão)"; }
+}
+const CAMPOS_LIM = ["umid_min","n_min","p_min","k_min"];
+const csrf = document.querySelector('meta[name="csrf"]').content;
+function mostrarLimites(r) {
+  CAMPOS_LIM.forEach(c => $("l_" + c).value = r.limites[c]);
+  $("limMsg").textContent = r.personalizado ? "Limites personalizados." : "Usando os limites padrão.";
+  $("limMsg").className = "ok";
+}
+async function carregarLimites() {
+  if (!$("dev").value) return;
+  mostrarLimites(await j("/api/limites?device=" + encodeURIComponent($("dev").value)));
+}
+async function enviarLimites(corpo) {
+  const r = await fetch("/api/limites", {method:"POST", headers:{"Content-Type":"application/json","X-CSRF":csrf},
+                                         body: JSON.stringify(Object.assign({device: $("dev").value}, corpo))});
+  const d = await r.json();
+  if (!r.ok) { $("limMsg").textContent = d.erro || "Erro ao salvar."; $("limMsg").className = "erro"; return; }
+  mostrarLimites(d); $("limMsg").textContent = corpo.restaurar ? "Padrão restaurado." : "Limites salvos.";
+}
+$("fLim").onsubmit = e => { e.preventDefault();
+  const limites = {}; CAMPOS_LIM.forEach(c => limites[c] = $("l_" + c).value); enviarLimites({limites}); };
+$("bPadrao").onclick = () => enviarLimites({restaurar: true});
+$("dev").onchange = () => { carregarLimites(); atualizar(); };
+$("horas").onchange = atualizar;
+carregarDispositivos().then(() => { carregarLimites(); atualizar(); setInterval(atualizar, 5000); });
+</script></body></html>

@@ -1,4 +1,3 @@
-# AGI
 # 🌱 Monitoramento Inteligente de Solo
 
 Plataforma de monitoramento de solo em tempo real: um dispositivo **ESP32** lê a **umidade** (3 zonas) e os **nutrientes N, P e K** (sensor RS485), envia os dados por **MQTT com TLS** para um backend **multi-cliente** e avisa por **e-mail ou WhatsApp** quando o solo seca ou os nutrientes caem. Opcionalmente, aciona uma **válvula solenoide** para irrigar.

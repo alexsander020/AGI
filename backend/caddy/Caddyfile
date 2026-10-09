@@ -1,0 +1,5 @@
+# HTTPS automático (Let's Encrypt). O login é feito pelo próprio app.
+{$DOMINIO} {
+	encode gzip
+	reverse_proxy backend:5000
+}

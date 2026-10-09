@@ -1,0 +1,68 @@
+services:
+  mosquitto:
+    image: eclipse-mosquitto:2
+    restart: unless-stopped
+    ports:
+      - "8883:8883"            # MQTT sobre TLS (ESP32 e backend)
+    volumes:
+      - ./mosquitto:/mosquitto/config:ro
+      - mosquitto_data:/mosquitto/data
+
+  backend:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      - mosquitto
+    environment:
+      DB_PATH: /data/solo.db
+      MQTT_HOST: mosquitto
+      MQTT_PORT: "8883"
+      MQTT_USER: backend
+      MQTT_PASS: ${MQTT_BACKEND_PASS:?defina MQTT_BACKEND_PASS no .env}
+      MQTT_CA: /certs/ca.crt
+      SECRET_KEY: ${SECRET_KEY:?defina SECRET_KEY no .env (openssl rand -hex 32)}
+      API_KEY: ${API_KEY:-}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      TWILIO_SID: ${TWILIO_SID:-}
+      TWILIO_TOKEN: ${TWILIO_TOKEN:-}
+      TWILIO_WHATSAPP_FROM: ${TWILIO_WHATSAPP_FROM:-}
+      ALERT_WHATSAPP_TO: ${ALERT_WHATSAPP_TO:-}
+      ALERTA_UMID_MIN: ${ALERTA_UMID_MIN:-30}
+      ALERTA_N_MIN: ${ALERTA_N_MIN:-20}
+      ALERTA_P_MIN: ${ALERTA_P_MIN:-10}
+      ALERTA_K_MIN: ${ALERTA_K_MIN:-60}
+      ALERTA_COOLDOWN_MIN: ${ALERTA_COOLDOWN_MIN:-60}
+    volumes:
+      - dados:/data
+      - ./mosquitto/certs/ca.crt:/certs/ca.crt:ro
+    # sem "ports": só o Caddy fala com o backend, pela rede interna
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request as u; u.urlopen('http://localhost:5000/api/ultima', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMINIO: ${DOMINIO:?defina DOMINIO no .env}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  dados:
+  mosquitto_data:
+  caddy_data:
+  caddy_config:

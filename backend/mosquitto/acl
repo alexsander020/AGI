@@ -1,0 +1,3 @@
+# O backend só lê. Cada ESP32 (adicionado por scripts/novo-usuario.sh) só publica nos próprios tópicos.
+user backend
+topic read solo/#

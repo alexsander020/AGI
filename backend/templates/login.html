@@ -1,0 +1,14 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Entrar - Monitor de Solo</title>
+{% include "_base_css.html" %}</head>
+<body><main style="max-width:360px">
+<h1>Monitor de Solo</h1>
+<div class="card">
+  {% if erro %}<p class="erro">{{ erro }}</p>{% endif %}
+  <form method="post">
+    <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+    <input type="email" name="email" placeholder="E-mail" required autofocus style="width:100%"><br>
+    <input type="password" name="senha" placeholder="Senha" required style="width:100%"><br>
+    <button style="width:100%;margin-top:8px">Entrar</button>
+  </form>
+</div></main></body></html>

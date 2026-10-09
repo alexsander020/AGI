@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>Admin - Monitor de Solo</title>
+{% include "_base_css.html" %}</head>
+<body><main>
+<header><h1>Administração</h1>
+<div><a href="{{ url_for('dashboard') }}">Dashboard</a> &middot; {{ usuario['email'] }}
+<form method="post" action="{{ url_for('logout') }}" style="display:inline">
+<input type="hidden" name="csrf" value="{{ csrf_token() }}"><button>Sair</button></form></div></header>
+
+{% for cat, msg in get_flashed_messages(with_categories=true) %}<p class="{{ cat }}">{{ msg }}</p>{% endfor %}
+
+<div class="card"><h2>Novo cliente (com login)</h2>
+<form method="post" action="{{ url_for('admin_cliente') }}" class="inline">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <input name="nome" placeholder="Nome do cliente" required>
+  <input type="email" name="email" placeholder="E-mail de login" required>
+  <input type="password" name="senha" placeholder="Senha (10+)" minlength="10" required>
+  <input name="email_alerta" placeholder="E-mails de alerta (vírgula)">
+  <input name="whatsapp_alerta" placeholder="WhatsApp +5511... (vírgula)">
+  <button>Criar</button></form></div>
+
+<div class="card"><h2>Nova fazenda</h2>
+<form method="post" action="{{ url_for('admin_fazenda') }}" class="inline">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <select name="cliente_id" required>{% for c in clientes %}<option value="{{ c['id'] }}">{{ c['nome'] }}</option>{% endfor %}</select>
+  <input name="nome" placeholder="Nome da fazenda" required><button>Criar</button></form></div>
+
+<div class="card"><h2>Novo dispositivo (ESP32)</h2>
+<form method="post" action="{{ url_for('admin_dispositivo') }}" class="inline">
+  <input type="hidden" name="csrf" value="{{ csrf_token() }}">
+  <select name="fazenda_id" required>{% for f in fazendas %}<option value="{{ f['id'] }}">{{ f['cliente'] }} / {{ f['nome'] }}</option>{% endfor %}</select>
+  <input name="device" placeholder="id (ex.: esp32-solo-02)" required>
+  <input name="zona" placeholder="zona MQTT (ex.: zona2)" required>
+  <input name="nome" placeholder="Nome (ex.: Talhão 1)" required><button>Cadastrar</button></form>
+<small>O id precisa ser igual ao DEVICE_ID do firmware e a zona igual ao tópico solo/&lt;zona&gt;/leitura.</small></div>
+
+<div class="card"><h2>Dispositivos</h2><table>
+<tr><th>Cliente</th><th>Fazenda</th><th>Nome</th><th>ID</th><th>Zona</th></tr>
+{% for d in dispositivos %}<tr><td>{{ d['cliente'] }}</td><td>{{ d['fazenda'] }}</td><td>{{ d['nome'] }}</td><td>{{ d['device'] }}</td><td>{{ d['zona'] }}</td></tr>{% endfor %}
+</table></div>
+</main></body></html>
